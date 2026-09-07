@@ -2,7 +2,7 @@
       "relation": ["delegate_permission/common.handle_all_urls"],
       "target": {
         "namespace": "android_app",
-        "package_name": "com.easysearch.sp4nd4n",
+        "package_name": "io.github.sp4nd4n.twa",
         "sha256_cert_fingerprints": ["B3:83:E0:4D:90:38:9E:B2:B8:9D:BC:DD:CA:B4:8A:F0:E0:F3:6F:AB:EC:1E:2D:A5:C7:7A:AC:56:6B:89:FF:99"]
       }
     }]
