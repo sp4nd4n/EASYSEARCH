@@ -92,6 +92,7 @@ EASYSEARCH/
 
 If better question quality matters more than staying at zero cost, `content.js`'s `generateQuestions()` function is the place to swap in a real AI API call (e.g. the Anthropic API) — that will cost a small amount per PDF generated, billed to whatever API key you provide.
 
+## 8. Installation issue
 When you'll try to install the app, the package installer of your phone tag it as harmful app. But don't worry as it is not signed officialy by Google playstore, that's why that message is coming. The app is not gonna collect your personal informationa secretly behind your back.
 
 ---
