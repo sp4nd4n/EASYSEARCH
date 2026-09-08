@@ -4,7 +4,7 @@
  * Actual PDF generation still needs a connection (to fetch the topic
  * content from Wikipedia), but the app UI itself will load instantly.
  */
-const CACHE_NAME = "easysearch-shell-v6";
+const CACHE_NAME = "easysearch-shell-v7";
 const SHELL_FILES = [
   "./",
   "./index.html",
