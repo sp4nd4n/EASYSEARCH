@@ -7,11 +7,14 @@
  *     Checked via Gutendex (https://gutendex.com), a free, keyless, CORS-
  *     enabled wrapper around Project Gutenberg's catalog. If the title is
  *     found with copyright:false, we fetch the actual plain-text file
- *     Gutenberg hosts and paginate the *entire, unmodified* file — which
- *     already includes Gutenberg's own header and footer/license text —
- *     into the PDF. We don't strip or edit that boilerplate: keeping it
- *     verbatim is the straightforward, always-compliant way to redistribute
- *     a Gutenberg text.
+ *     Gutenberg hosts. Gutenberg's own file servers often don't send the
+ *     CORS header a browser needs to read that response directly, so a
+ *     blocked direct fetch is retried once through a free public CORS
+ *     relay (allorigins.win) before giving up. The fetched file is
+ *     paginated *entirely unmodified* — including Gutenberg's own header
+ *     and footer/license text — into the PDF. We don't strip or edit that
+ *     boilerplate: keeping it verbatim is the straightforward, always-
+ *     compliant way to redistribute a Gutenberg text.
  *
  *  2. STILL UNDER COPYRIGHT → study guide, not the book.
  *     We do not have, and will not build, any free (or paid) way to
@@ -49,8 +52,18 @@ const Books = (() => {
       const res = await fetch(url);
       if (!res.ok) return null;
       const data = await res.json();
-      const hit = (data.results || []).find(b => b.copyright === false) || null;
-      if (!hit) return null;
+      const candidates = (data.results || []).filter(b => b.copyright === false);
+      if (!candidates.length) return null;
+
+      // Gutendex's search is fuzzy and can rank an unrelated public-domain book
+      // above the one actually being searched for — prefer a real title match
+      // over just taking the first copyright:false result.
+      const norm = s => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const query = norm(title);
+      const hit =
+        candidates.find(b => norm(b.title) === query) ||
+        candidates.find(b => norm(b.title).includes(query) || query.includes(norm(b.title))) ||
+        candidates[0];
 
       const textUrl = hit.formats && (hit.formats["text/plain; charset=utf-8"] || hit.formats["text/plain"]);
       if (!textUrl) return null; // no plain-text format available for this edition
@@ -67,15 +80,33 @@ const Books = (() => {
     }
   }
 
-  /** Fetches the full raw Gutenberg text file. Returns null on any network/CORS failure. */
+  /**
+   * Fetches the full raw Gutenberg text file.
+   * Gutenberg's own file servers frequently don't send the CORS header a
+   * browser needs to read a cross-origin response, which was silently
+   * sending every book down the study-guide path. We try a direct fetch
+   * first, and if that's blocked, retry once through allorigins.win — a
+   * free, keyless public CORS relay — before giving up.
+   */
   async function fetchGutenbergText(textUrl) {
     try {
       const res = await fetch(textUrl);
+      if (res.ok) {
+        const text = await res.text();
+        if (text && text.length > 0) return text;
+      }
+    } catch (e) {
+      console.warn("Direct Gutenberg fetch blocked (likely CORS), retrying via relay:", e);
+    }
+
+    try {
+      const relayUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(textUrl)}`;
+      const res = await fetch(relayUrl);
       if (!res.ok) return null;
       const text = await res.text();
       return text && text.length > 0 ? text : null;
     } catch (e) {
-      console.warn("Could not fetch Gutenberg text (falling back to study guide):", e);
+      console.warn("Could not fetch Gutenberg text via relay either (falling back to study guide):", e);
       return null;
     }
   }

@@ -509,6 +509,43 @@ const App = (() => {
     }
   }
 
+  // ---------- swipe gestures (left/right between tabs) ----------
+  function initSwipeGestures() {
+    const area = document.getElementById("tab-content-area");
+    if (!area) return;
+    const SWIPE_THRESHOLD = 60;
+    let startX = 0, startY = 0, tracking = false;
+
+    area.addEventListener("touchstart", (e) => {
+      const activeId = document.querySelector(".screen.active")?.id;
+      tracking = TAB_SCREENS.includes(activeId) && e.touches.length === 1;
+      if (!tracking) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    area.addEventListener("touchend", (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+
+      // Ignore short drags and anything more vertical than horizontal (scrolling a list, etc.)
+      if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+
+      const activeId = document.querySelector(".screen.active")?.id;
+      const idx = TAB_SCREENS.indexOf(activeId);
+      if (idx === -1) return;
+
+      if (dx < 0 && idx < TAB_SCREENS.length - 1) {
+        showScreen(TAB_SCREENS[idx + 1]); // swiped left -> next tab
+      } else if (dx > 0 && idx > 0) {
+        showScreen(TAB_SCREENS[idx - 1]); // swiped right -> previous tab
+      }
+    }, { passive: true });
+  }
+
   // ---------- boot ----------
   function init() {
     document.getElementById("credit-year").textContent = new Date().getFullYear();
@@ -519,6 +556,7 @@ const App = (() => {
     initBookFlow();
     initBookResultScreen();
     initSettings();
+    initSwipeGestures();
 
     const existingUser = Storage.getUser();
     if (existingUser) {
