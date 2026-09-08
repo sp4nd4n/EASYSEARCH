@@ -18,7 +18,7 @@
  * zero-cost, client-only app like this one.
  */
 const CONFIG = {
-  GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+  GOOGLE_CLIENT_ID: "986970006034-eb4db9p1jmh2f9mps27h43m75ndfehpv.apps.googleusercontent.com",
   APP_NAME: "EASYSEARCH",
   DEVELOPER: "Spandan Chatterjee"
 };
