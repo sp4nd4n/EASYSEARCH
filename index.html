@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>EASYSEARCH</title>
+<meta name="description" content="Turn any topic into a study PDF, built for school, college and work." />
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#070B14" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="EasySearch" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="icon" href="icons/icon-192.png" />
+
+<!-- Fonts (free, Google Fonts CDN) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/styles.css" />
+
+<!-- Google Identity Services (free, no key cost) -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- jsPDF (free, MIT licensed, from CDN) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ LOGIN ============ -->
+  <section id="screen-login" class="screen active">
+    <div class="login-card">
+      <div class="login-mark">ES</div>
+      <h1 class="wordmark">EASY<em>SEARCH</em></h1>
+      <p>Turn any topic into a clean, structured study PDF — sign in to start.</p>
+      <div id="google-btn-container"></div>
+      <p class="login-legal">By continuing you agree that EasySearch stores your session and generated titles only on this device.</p>
+    </div>
+  </section>
+
+  <div id="tab-content-area" class="tab-content-area">
+
+  <!-- ============ HOME ============ -->
+  <section id="screen-home" class="screen">
+    <div class="topbar">
+      <span class="wordmark" style="font-size:20px;">EASY<em>SEARCH</em></span>
+    </div>
+
+    <div class="search-bar" id="open-create">
+      <span class="plus">＋</span>
+      <span>Create content</span>
+    </div>
+
+    <div class="section-label">Your documents</div>
+    <div id="history-list" class="history-list">
+      <div class="empty-state">No PDFs yet. Tap "Create content" to generate your first study document.</div>
+    </div>
+
+    <div style="flex:1"></div>
+  </section>
+
+  <!-- ============ BOOKS ============ -->
+  <section id="screen-books" class="screen">
+    <div class="topbar">
+      <span class="wordmark" style="font-size:20px;">EASY<em>SEARCH</em></span>
+    </div>
+
+    <div class="search-bar" id="open-book-create">
+      <span class="plus">＋</span>
+      <span>Find a book</span>
+    </div>
+
+    <div class="section-label">Your books</div>
+    <div id="book-history-list" class="history-list">
+      <div class="empty-state">No books yet. Tap "Find a book" to generate your first one.</div>
+    </div>
+
+    <div style="flex:1"></div>
+  </section>
+
+  <!-- ============ BOOKS — INPUT ============ -->
+  <section id="screen-book-input" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" data-back="screen-books">←</button>
+      <span></span>
+    </div>
+    <h2>Which book?</h2>
+    <p>Type the title. Public-domain classics get the full text; anything still under copyright gets a study guide (summary, themes, discussion questions) instead — never the copyrighted text itself.</p>
+
+    <textarea id="book-title-input" rows="2" placeholder="Type a book title…"></textarea>
+
+    <div class="topic-suggestions">
+      <span class="chip" data-topic="Pride and Prejudice">Pride and Prejudice</span>
+      <span class="chip" data-topic="Sherlock Holmes">Sherlock Holmes</span>
+      <span class="chip" data-topic="Dracula">Dracula</span>
+      <span class="chip" data-topic="1984">1984</span>
+      <span class="chip" data-topic="The Alchemist">The Alchemist</span>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <div class="option-title">Add discussion questions</div>
+        <div class="option-sub">Adds a Q&amp;A section at the end</div>
+      </div>
+      <div class="switch" id="toggle-book-questions"></div>
+    </div>
+
+    <div class="spacer"></div>
+    <div class="footer-actions">
+      <button class="btn btn-primary" id="btn-book-generate" disabled>Generate PDF</button>
+    </div>
+  </section>
+
+  <!-- ============ BOOKS — GENERATING ============ -->
+  <section id="screen-book-generating" class="screen">
+    <div class="spinner"></div>
+    <h2>Building your book</h2>
+    <p id="book-generating-status">Checking availability…</p>
+  </section>
+
+  <!-- ============ BOOKS — RESULT ============ -->
+  <section id="screen-book-result" class="screen">
+    <div class="result-mark">
+      <svg class="check-icon" viewBox="0 0 52 52">
+        <circle class="check-icon-circle" cx="26" cy="26" r="23" fill="none"/>
+        <path class="check-icon-check" fill="none" d="M14 27l7 7 16-16"/>
+      </svg>
+    </div>
+    <h2 id="book-result-title">Your PDF is ready</h2>
+    <p id="book-result-sub">Saved to your books. You can reopen it any time — EasySearch will rebuild it instantly.</p>
+    <div class="result-actions">
+      <button class="btn btn-primary" id="btn-book-download">Download PDF</button>
+      <button class="btn btn-outline" id="btn-book-result-home">Back to books</button>
+    </div>
+  </section>
+
+  <!-- ============ CREATE — STEP 1: DESIGNATION ============ -->
+  <section id="screen-designation" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" data-back="screen-home">←</button>
+      <span></span>
+    </div>
+    <div class="step-progress"><span class="done"></span><span></span><span></span><span></span></div>
+    <h2>Who's this for?</h2>
+    <p>This shapes the depth and language of the content.</p>
+
+    <div class="option-list" id="designation-list">
+      <div class="option-card" data-value="school">
+        <div class="glyph">S</div>
+        <div>
+          <div class="option-title">School</div>
+          <div class="option-sub">Simple language, short overview</div>
+        </div>
+      </div>
+      <div class="option-card" data-value="college">
+        <div class="glyph">C</div>
+        <div>
+          <div class="option-title">College</div>
+          <div class="option-sub">Structured detail, key sections</div>
+        </div>
+      </div>
+      <div class="option-card" data-value="job">
+        <div class="glyph">J</div>
+        <div>
+          <div class="option-title">Job / Professional</div>
+          <div class="option-sub">Fuller depth, technical detail</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+    <div class="footer-actions">
+      <button class="btn btn-primary" id="btn-designation-continue" disabled>Continue</button>
+    </div>
+  </section>
+
+  <!-- ============ CREATE — STEP 2: PAGE LENGTH ============ -->
+  <section id="screen-pages" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" data-back="screen-designation">←</button>
+      <span></span>
+    </div>
+    <div class="step-progress"><span class="done"></span><span class="done"></span><span></span><span></span></div>
+    <h2>How long should it be?</h2>
+    <p>Controls roughly how many pages the PDF ends up as.</p>
+
+    <div class="option-list" id="pages-list">
+      <div class="option-card" data-value="short">
+        <div class="glyph">1</div>
+        <div>
+          <div class="option-title">Short</div>
+          <div class="option-sub">About 1–2 pages</div>
+        </div>
+      </div>
+      <div class="option-card" data-value="medium">
+        <div class="glyph">2</div>
+        <div>
+          <div class="option-title">Medium</div>
+          <div class="option-sub">About 3–5 pages</div>
+        </div>
+      </div>
+      <div class="option-card" data-value="long">
+        <div class="glyph">3</div>
+        <div>
+          <div class="option-title">Long</div>
+          <div class="option-sub">6+ pages, fullest detail</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+    <div class="footer-actions">
+      <button class="btn btn-primary" id="btn-pages-continue" disabled>Continue</button>
+    </div>
+  </section>
+
+  <!-- ============ CREATE — STEP 3: QUESTIONS TOGGLE ============ -->
+  <section id="screen-questions" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" data-back="screen-pages">←</button>
+      <span></span>
+    </div>
+    <div class="step-progress"><span class="done"></span><span class="done"></span><span class="done"></span><span></span></div>
+    <h2>Add practice questions?</h2>
+    <p>Questions and answers can be added to the end of the PDF.</p>
+
+    <div class="toggle-row">
+      <div>
+        <div class="option-title">Include Q&amp;A section</div>
+        <div class="option-sub">Adds questions with answers on the last page</div>
+      </div>
+      <div class="switch" id="toggle-questions"></div>
+    </div>
+
+    <div class="spacer"></div>
+    <div class="footer-actions">
+      <button class="btn btn-primary" id="btn-questions-continue">Continue</button>
+    </div>
+  </section>
+
+  <!-- ============ CREATE — STEP 3: TOPIC ============ -->
+  <section id="screen-topic" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" data-back="screen-questions">←</button>
+      <span></span>
+    </div>
+    <div class="step-progress"><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span></div>
+    <h2>What's the topic?</h2>
+    <p>Write a subject — e.g. astronomy, cancer biology, the French Revolution.</p>
+
+    <textarea id="topic-input" rows="3" placeholder="Type a topic…"></textarea>
+
+    <div class="topic-suggestions">
+      <span class="chip" data-topic="Astronomy">Astronomy</span>
+      <span class="chip" data-topic="Cancer biology">Cancer biology</span>
+      <span class="chip" data-topic="French Revolution">French Revolution</span>
+      <span class="chip" data-topic="Photosynthesis">Photosynthesis</span>
+      <span class="chip" data-topic="Machine learning">Machine learning</span>
+    </div>
+
+    <div class="spacer"></div>
+    <div class="footer-actions">
+      <button class="btn btn-primary" id="btn-generate" disabled>Generate PDF</button>
+    </div>
+  </section>
+
+  <!-- ============ GENERATING ============ -->
+  <section id="screen-generating" class="screen">
+    <div class="spinner"></div>
+    <h2>Building your document</h2>
+    <p id="generating-status">Fetching source material…</p>
+  </section>
+
+  <!-- ============ RESULT ============ -->
+  <section id="screen-result" class="screen">
+    <div class="result-mark">
+      <svg class="check-icon" viewBox="0 0 52 52">
+        <circle class="check-icon-circle" cx="26" cy="26" r="23" fill="none"/>
+        <path class="check-icon-check" fill="none" d="M14 27l7 7 16-16"/>
+      </svg>
+    </div>
+    <h2 id="result-title">Your PDF is ready</h2>
+    <p id="result-sub">Saved to your documents. You can reopen it any time — EasySearch will rebuild it instantly.</p>
+    <div class="result-actions">
+      <button class="btn btn-primary" id="btn-download">Download PDF</button>
+      <button class="btn btn-outline" id="btn-result-home">Back to home</button>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="screen-settings" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" data-back="screen-home">←</button>
+      <span></span>
+    </div>
+    <h2>Settings</h2>
+
+    <div class="profile-row">
+      <img id="profile-avatar" class="profile-avatar" src="icons/icon-192.png" alt="" />
+      <div>
+        <div id="profile-name" class="profile-name">Guest</div>
+        <div id="profile-email" class="profile-email"></div>
+      </div>
+    </div>
+
+    <div class="settings-row" id="open-credits">
+      <span class="settings-label">About &amp; credits</span>
+      <span class="settings-chevron">›</span>
+    </div>
+    <div class="settings-row" id="btn-clear-history">
+      <span class="settings-label">Delete all documents</span>
+      <span class="settings-chevron">›</span>
+    </div>
+    <div class="settings-row" id="btn-sign-out">
+      <span class="settings-label">Sign out</span>
+      <span class="settings-chevron">›</span>
+    </div>
+    <div class="settings-row" id="btn-delete-account">
+      <span class="settings-label" style="color:var(--danger);">Delete account</span>
+      <span class="settings-chevron">›</span>
+    </div>
+  </section>
+
+  <!-- ============ CREDITS ============ -->
+  <section id="screen-credits" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" data-back="screen-settings">←</button>
+      <span></span>
+    </div>
+    <h2>About EasySearch</h2>
+    <p>EasySearch generates structured study PDFs from public reference material, shaped for school, college or professional use.</p>
+
+    <div class="credit-card">
+      <div class="credit-name">Spandan Chatterjee</div>
+      <div class="credit-role">Developer</div>
+      <p style="margin:0;">Designed and built EasySearch end to end — concept, interface and content engine.</p>
+      <div class="credit-copy">© <span id="credit-year"></span> Spandan Chatterjee. All rights reserved.</div>
+    </div>
+  </section>
+
+  </div>
+
+  <!-- ============ BOTTOM NAV ============ -->
+  <nav class="tabbar" id="tabbar">
+    <button class="tab-btn active" data-tab="screen-home">
+      <span class="tab-glyph">⌂</span> PDF
+    </button>
+    <button class="tab-btn" data-tab="screen-books">
+      <span class="tab-glyph">▤</span> Books
+    </button>
+    <button class="tab-btn" data-tab="screen-settings">
+      <span class="tab-glyph">⚙</span> Settings
+    </button>
+  </nav>
+
+</div>
+
+<div id="toast"></div>
+
+<!-- delete confirmation modal -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal-card">
+    <h3 id="modal-title">Delete this?</h3>
+    <p id="modal-body">This can't be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="modal-cancel">Cancel</button>
+      <button class="btn btn-danger" id="modal-confirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/content.js"></script>
+<script src="js/books.js"></script>
+<script src="js/pdf-fonts.js"></script>
+<script src="js/pdf.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
