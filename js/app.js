@@ -3,7 +3,6 @@
  */
 const App = (() => {
   const wizard = { designation: null, pageGoal: null, includeQuestions: false, topic: "" };
-  const bookWizard = { title: "", includeQuestions: false };
   let lastGenerated = null; // { data, meta, filename } for the result screen's download button
   let lastGeneratedBook = null; // same, for the Books result screen
   let pendingRegenerate = null; // history item being reopened, if any
@@ -352,39 +351,103 @@ const App = (() => {
   }
 
   // ---------- books flow wiring ----------
-  function resetBookWizard() {
-    bookWizard.title = "";
-    bookWizard.includeQuestions = false;
-    document.getElementById("book-title-input").value = "";
-    document.getElementById("toggle-book-questions").classList.remove("on");
-    document.getElementById("btn-book-generate").disabled = true;
+  let bookSearchToken = 0; // guards against a slow, stale search overwriting a newer one
+
+  function resetBookSearch() {
+    document.getElementById("book-search-input").value = "";
+    document.getElementById("book-search-results").innerHTML =
+      `<div class="empty-state">Search for a book to see results.</div>`;
+  }
+
+  function escapeAttr(str) {
+    return String(str || "").replace(/"/g, "&quot;");
+  }
+
+  function renderBookSearchResults(results, query) {
+    const el = document.getElementById("book-search-results");
+    if (!results.length) {
+      el.innerHTML = `<div class="book-search-empty">No books found for "${escapeHtml(query)}". Try a different spelling or a shorter title.</div>`;
+      return;
+    }
+    const sourceLabel = { openlibrary: "Open Library", googlebooks: "Google Books" };
+    el.innerHTML = "";
+    results.forEach((book, i) => {
+      const card = document.createElement("div");
+      card.className = "book-result-card";
+      const cover = book.coverUrl
+        ? `<img class="book-result-cover" src="${escapeAttr(book.coverUrl)}" alt="" loading="lazy" />`
+        : `<div class="book-result-cover placeholder">📖</div>`;
+      const meta = [book.author, book.year].filter(Boolean).join(" · ");
+
+      let actions = `<button class="book-action-btn primary" data-action="generate" data-idx="${i}">Generate PDF</button>`;
+      if (book.freeDownloadUrl) {
+        actions += `<button class="book-action-btn" data-action="download" data-idx="${i}">Download free</button>`;
+      }
+      if (book.previewUrl) {
+        actions += `<button class="book-action-btn" data-action="preview" data-idx="${i}">Preview</button>`;
+      }
+
+      card.innerHTML = `
+        ${cover}
+        <div class="book-result-info">
+          <div class="book-result-title">${escapeHtml(book.title)}</div>
+          ${meta ? `<div class="book-result-meta">${escapeHtml(meta)}</div>` : ""}
+          <div class="book-source-badge">${sourceLabel[book.source] || book.source}</div>
+          <div class="book-result-actions">${actions}</div>
+        </div>
+      `;
+      el.appendChild(card);
+    });
+
+    el.querySelectorAll("[data-action]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const book = results[Number(btn.dataset.idx)];
+        if (btn.dataset.action === "download") window.open(book.freeDownloadUrl, "_blank", "noopener");
+        else if (btn.dataset.action === "preview") window.open(book.previewUrl, "_blank", "noopener");
+        else runBookGeneration(book.title, true, null);
+      });
+    });
+  }
+
+  async function runBookSearch(query) {
+    const el = document.getElementById("book-search-results");
+    const token = ++bookSearchToken;
+    el.innerHTML = `<div class="book-search-loading">Searching…</div>`;
+    try {
+      const results = await Books.searchBooks(query);
+      if (token !== bookSearchToken) return; // a newer search started while this one was in flight
+      renderBookSearchResults(results, query);
+    } catch (e) {
+      console.error(e);
+      if (token !== bookSearchToken) return;
+      el.innerHTML = `<div class="book-search-empty">Search failed — please try again.</div>`;
+    }
   }
 
   function initBookFlow() {
     document.getElementById("open-book-create").addEventListener("click", () => {
-      resetBookWizard();
+      resetBookSearch();
       showScreen("screen-book-input");
     });
 
-    const titleInput = document.getElementById("book-title-input");
-    titleInput.addEventListener("input", () => {
-      bookWizard.title = titleInput.value.trim();
-      document.getElementById("btn-book-generate").disabled = bookWizard.title.length === 0;
+    const searchInput = document.getElementById("book-search-input");
+    let debounceTimer = null;
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.trim();
+      clearTimeout(debounceTimer);
+      if (q.length < 3) {
+        document.getElementById("book-search-results").innerHTML =
+          `<div class="empty-state">Search for a book to see results.</div>`;
+        return;
+      }
+      debounceTimer = setTimeout(() => runBookSearch(q), 500);
     });
-    document.querySelectorAll("#screen-book-input .chip").forEach(chip => {
-      chip.addEventListener("click", () => {
-        titleInput.value = chip.dataset.topic;
-        titleInput.dispatchEvent(new Event("input"));
-      });
-    });
-
-    document.getElementById("toggle-book-questions").addEventListener("click", (e) => {
-      e.currentTarget.classList.toggle("on");
-      bookWizard.includeQuestions = e.currentTarget.classList.contains("on");
-    });
-
-    document.getElementById("btn-book-generate").addEventListener("click", () => {
-      runBookGeneration(bookWizard.title, bookWizard.includeQuestions, null);
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        clearTimeout(debounceTimer);
+        const q = searchInput.value.trim();
+        if (q.length >= 2) runBookSearch(q);
+      }
     });
   }
 

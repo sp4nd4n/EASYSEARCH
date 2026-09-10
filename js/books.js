@@ -33,6 +33,7 @@ const Books = (() => {
   const GUTENDEX_API = "https://gutendex.com/books/";
   const WIKI_API = "https://en.wikipedia.org/w/api.php";
   const OPENLIBRARY_API = "https://openlibrary.org/search.json";
+  const GOOGLEBOOKS_API = "https://www.googleapis.com/books/v1/volumes";
 
   function blobToDataUrl(blob) {
     return new Promise((resolve, reject) => {
@@ -238,6 +239,73 @@ const Books = (() => {
     "Would you recommend this book to a friend? Why or why not?"
   ];
 
+  // ---------------- Search (Open Library + Google Books) ----------------
+
+  function normKey(title, author) {
+    const n = s => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return `${n(title)}|${n(author)}`;
+  }
+
+  async function searchOpenLibrary(query) {
+    try {
+      const url = `${OPENLIBRARY_API}?q=${encodeURIComponent(query)}&limit=10&fields=title,author_name,first_publish_year,cover_i,ia,ebook_access,key`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.docs || []).map(d => ({
+        source: "openlibrary",
+        title: d.title,
+        author: d.author_name && d.author_name[0],
+        year: d.first_publish_year,
+        coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : null,
+        // ebook_access "public" means a full free copy is readable/downloadable on Archive.org.
+        freeDownloadUrl: (d.ebook_access === "public" && d.ia && d.ia[0]) ? `https://archive.org/details/${d.ia[0]}` : null,
+        workUrl: d.key ? `https://openlibrary.org${d.key}` : null
+      }));
+    } catch (e) {
+      console.warn("Open Library search failed:", e);
+      return [];
+    }
+  }
+
+  async function searchGoogleBooks(query) {
+    try {
+      const url = `${GOOGLEBOOKS_API}?q=${encodeURIComponent(query)}&maxResults=10`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.items || []).map(it => {
+        const v = it.volumeInfo || {};
+        const a = it.accessInfo || {};
+        return {
+          source: "googlebooks",
+          title: v.title,
+          author: v.authors && v.authors[0],
+          year: v.publishedDate && v.publishedDate.slice(0, 4),
+          coverUrl: v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail),
+          // Google hosts a genuine free PDF for some public-domain scans it digitized itself.
+          freeDownloadUrl: (a.pdf && a.pdf.isAvailable && a.pdf.downloadLink) ? a.pdf.downloadLink : null,
+          previewUrl: v.previewLink || v.infoLink || null
+        };
+      }).filter(b => b.title);
+    } catch (e) {
+      console.warn("Google Books search failed:", e);
+      return [];
+    }
+  }
+
+  /**
+   * Searches both sources in parallel and merges them into one list, Open
+   * Library first (bigger catalog, richer public-domain signal), lightly
+   * deduped against Google Books entries for the same title/author.
+   */
+  async function searchBooks(query) {
+    const [olResults, gbResults] = await Promise.all([searchOpenLibrary(query), searchGoogleBooks(query)]);
+    const seen = new Set(olResults.map(b => normKey(b.title, b.author)));
+    const merged = olResults.concat(gbResults.filter(b => !seen.has(normKey(b.title, b.author))));
+    return merged;
+  }
+
   // ---------------- Main entry point ----------------
 
   /**
@@ -268,5 +336,5 @@ const Books = (() => {
     return buildStudyGuide(title, includeQuestions, onStatus);
   }
 
-  return { generate };
+  return { generate, searchBooks };
 })();
